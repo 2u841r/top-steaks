@@ -36,3 +36,15 @@ h({query:{username:'torvalds',top:'5'}}, {
 })
 "
 ```
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+
+## More Extensions by Developer
+<ul>
+  <li><a href="https://dub.sh/zizvsc">My VS Code Publisher link</a></li>
+  <li><a href="https://dub.sh/zizovpsx">My Open-VSX Publisher link</a></li>
+  <li><a href="https://dub.sh/deletething">DeleteThing Chrome Extension</a></li>
+</ul>  
+
