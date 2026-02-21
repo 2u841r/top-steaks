@@ -1,11 +1,31 @@
 const axios = require("axios");
 
-// Fetch all contribution weeks from GitHub GraphQL
-async function getContributions(username, token) {
+// GitHub only returns ~1 year per contributionsCollection call. Get all years first, then fetch each year.
+async function getContributionYears(username, token) {
   const query = `
     query($login: String!) {
       user(login: $login) {
         contributionsCollection {
+          contributionYears
+        }
+      }
+    }
+  `;
+  const res = await axios.post(
+    "https://api.github.com/graphql",
+    { query, variables: { login: username } },
+    { headers: { Authorization: `bearer ${token}` } }
+  );
+  return res.data.data.user.contributionsCollection.contributionYears || [];
+}
+
+async function getContributionsForYear(username, token, year) {
+  const from = `${year}-01-01T00:00:00Z`;
+  const to = `${year}-12-31T23:59:59Z`;
+  const query = `
+    query($login: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $login) {
+        contributionsCollection(from: $from, to: $to) {
           contributionCalendar {
             weeks {
               contributionDays {
@@ -20,11 +40,23 @@ async function getContributions(username, token) {
   `;
   const res = await axios.post(
     "https://api.github.com/graphql",
-    { query, variables: { login: username } },
+    { query, variables: { login: username, from, to } },
     { headers: { Authorization: `bearer ${token}` } }
   );
   const weeks = res.data.data.user.contributionsCollection.contributionCalendar.weeks;
   return weeks.flatMap((w) => w.contributionDays);
+}
+
+async function getAllContributions(username, token) {
+  const years = await getContributionYears(username, token);
+  if (years.length === 0) return [];
+
+  const yearResults = await Promise.all(
+    years.map((year) => getContributionsForYear(username, token, year))
+  );
+  const allDays = yearResults.flat();
+  allDays.sort((a, b) => a.date.localeCompare(b.date));
+  return allDays;
 }
 
 // Calculate all streaks from contribution days
@@ -102,7 +134,7 @@ module.exports = async (req, res) => {
   if (!token) return res.status(500).send("GITHUB_TOKEN not set");
 
   try {
-    const days = await getContributions(username, token);
+    const days = await getAllContributions(username, token);
     const streaks = calculateStreaks(days);
     const topN = Math.min(parseInt(top) || 3, 10);
     const svg = generateSVG(username, streaks, topN);
